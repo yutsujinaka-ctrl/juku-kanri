@@ -266,13 +266,6 @@ tr:hover td { background:var(--surface2); }
         <input type="text" id="input-name" placeholder="例：田中 太郎">
       </div>
       <div class="form-group">
-        <label>学年</label>
-        <select id="input-grade">
-          <option>中1</option><option>中2</option><option selected>中3</option>
-          <option>高1</option><option>高2</option><option>高3</option>
-        </select>
-      </div>
-      <div class="form-group">
         <label>保護者LINE ID（メモ）</label>
         <input type="text" id="input-line" placeholder="@xxxxxxxx">
       </div>
@@ -302,7 +295,7 @@ tr:hover td { background:var(--surface2); }
     </div>
     <div style="overflow-x:auto">
       <table>
-        <thead><tr><th>生徒名</th><th>学年</th><th>種別</th><th>日時</th></tr></thead>
+        <thead><tr><th>生徒名</th><th>種別</th><th>日時</th></tr></thead>
         <tbody id="log-tbody"></tbody>
       </table>
     </div>
@@ -419,7 +412,7 @@ async function fetchStudents() {
 
 async function fetchLogs(filter='all') {
   let q = db.from('attendance_logs')
-    .select('*, students(name, grade)')
+    .select('*, students(name)')
     .order('created_at', { ascending: false })
     .limit(200);
   if (filter !== 'all') q = q.eq('type', filter);
@@ -442,7 +435,7 @@ async function loadAndRenderCheckin() {
 function renderCheckinSelect() {
   const sel = document.getElementById('checkin-select');
   sel.innerHTML = '<option value="">── 名前を選んでください ──</option>' +
-    students.map(s => `<option value="${s.id}">${s.name}（${s.grade}）</option>`).join('');
+    students.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   document.getElementById('checkin-buttons').style.display = 'none';
   document.getElementById('current-status-banner').style.display = 'none';
 }
@@ -499,7 +492,7 @@ async function submitCheckin(type) {
     const title = document.getElementById('success-title');
     title.textContent  = type==='enter' ? '入室しました' : '退室しました';
     title.className    = 'success-title ' + type;
-    document.getElementById('success-student').textContent = s.name + ' さん（' + s.grade + '）';
+    document.getElementById('success-student').textContent = s.name + ' さん';
     document.getElementById('success-time').textContent    = formatTime(now);
 
     sendLineNotify(s, type);
@@ -529,7 +522,7 @@ async function sendLineNotify(student, type) {
       body: JSON.stringify({
         userId: student.line_id,
         studentName: student.name,
-        grade: student.grade,
+        
         type: type,
       }),
     });
@@ -547,7 +540,7 @@ function showNotifModal(student, type, time) {
     `<strong>${student.name}</strong> さんが<br>` +
     `<strong>${formatTime(time)}</strong> に<br>` +
     `<span class="notif-type-${type}"><strong>${label}しました。</strong></span><br><br>` +
-    `──────────<br>📚 ○○学習塾`;
+    `──────────<br>📚 桜凛進学塾`;
   document.getElementById('notif-overlay').classList.add('open');
 }
 function closeNotif() {
@@ -584,7 +577,6 @@ function copyURL() {
 
 async function addStudent() {
   const name  = document.getElementById('input-name').value.trim();
-  const grade = document.getElementById('input-grade').value;
   const line  = document.getElementById('input-line').value.trim();
   if (!name) { showToast('⚠️ 生徒名を入力してください'); return; }
 
@@ -594,7 +586,7 @@ async function addStudent() {
 
   try {
     const { error } = await db.from('students')
-      .insert({ name, grade, line_id: line || null, in_room: false });
+      .insert({ name, line_id: line || null, in_room: false });
     if (error) throw error;
 
     document.getElementById('input-name').value = '';
@@ -620,7 +612,7 @@ function renderStudents() {
     <div class="student-card">
       <div>
         <div class="student-name">${s.name}</div>
-        <div class="student-meta">${s.grade}${s.line_id ? ' · ' + s.line_id : ''}</div>
+        <div class="student-meta">${s.line_id ?? ''}</div>
       </div>
       <span class="student-status ${s.in_room ? 'status-in' : 'status-out'}">
         <span class="status-dot"></span>${s.in_room ? '在室中' : '退室中'}
@@ -681,7 +673,7 @@ function renderLog() {
   tbody.innerHTML = logs.map(l => `
     <tr>
       <td style="font-weight:600">${l.students?.name ?? '不明'}</td>
-      <td style="color:var(--text2)">${l.students?.grade ?? ''}</td>
+      
       <td><span class="badge ${l.type==='enter'?'badge-enter':'badge-exit'}">${l.type==='enter'?'📥 入室':'📤 退室'}</span></td>
       <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${formatTime(new Date(l.created_at))}</td>
     </tr>
@@ -710,7 +702,7 @@ async function loadAndRenderParent() {
     await fetchStudents();
     const sel = document.getElementById('parent-select');
     sel.innerHTML = '<option value="">── 生徒を選んでください ──</option>' +
-      students.map(s => `<option value="${s.id}">${s.name}（${s.grade}）</option>`).join('');
+      students.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
     document.getElementById('parent-view').style.display = 'none';
   } catch(e) {
     showToast('⚠️ データの読み込みに失敗しました');
