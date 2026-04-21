@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>塾入退室管理</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #f5f4f0;
+  --surface: #ffffff;
+  --surface2: #f0efe9;
+  --border: #e2e0d8;
+  --accent: #2d6a4f;
+  --accent-light: #d8f3dc;
+  --accent2: #e63946;
+  --accent2-light: #ffe8ea;
+  --text: #1a1a1a;
+  --text2: #6b6b6b;
+  --text3: #9b9b9b;
+  --enter: #2d6a4f;
+  --exit: #e63946;
+  --shadow: 0 2px 12px rgba(0,0,0,.08);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,.12);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+nav {
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:0 20px; display:flex; align-items:center; height:54px;
+  position:sticky; top:0; z-index:100; box-shadow:var(--shadow);
+}
+.nav-brand { font-size:15px; font-weight:900; color:var(--accent); margin-right:24px; white-space:nowrap; }
+.nav-tabs { display:flex; gap:2px; }
+.nav-tab {
+  padding:6px 14px; border-radius:6px; font-size:13px; font-weight:500;
+  cursor:pointer; border:none; background:transparent; color:var(--text2);
+  transition:all .15s; font-family:inherit;
+}
+.nav-tab:hover { color:var(--text); background:var(--surface2); }
+.nav-tab.active { color:var(--accent); background:var(--accent-light); font-weight:700; }
+
+.page { display:none; padding:28px 20px; max-width:860px; margin:0 auto; }
+.page.active { display:block; }
+#page-checkin { max-width:460px; }
+
+h2 { font-size:22px; font-weight:900; margin-bottom:20px; letter-spacing:-.02em; }
+.section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--text3); margin-bottom:12px; }
+
+.card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:22px; margin-bottom:16px; box-shadow:var(--shadow); }
+
+.form-row { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+.form-group { display:flex; flex-direction:column; gap:5px; flex:1; min-width:160px; }
+label { font-size:12px; font-weight:600; color:var(--text2); }
+input, select {
+  background:var(--surface2); border:1.5px solid var(--border); border-radius:8px;
+  padding:9px 12px; color:var(--text); font-size:14px; font-family:inherit;
+  outline:none; transition:border-color .15s;
+}
+input:focus, select:focus { border-color:var(--accent); background:#fff; }
+input::placeholder { color:var(--text3); }
+
+.btn { padding:9px 20px; border-radius:8px; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; border:none; transition:all .15s; white-space:nowrap; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { background:#1f4d38; }
+.btn-enter { background:var(--enter); color:#fff; font-size:16px; padding:14px; width:100%; border-radius:12px; }
+.btn-enter:hover { background:#1f4d38; }
+.btn-exit  { background:var(--exit);  color:#fff; font-size:16px; padding:14px; width:100%; border-radius:12px; }
+.btn-exit:hover  { background:#c1121f; }
+.btn-sm    { padding:5px 12px; font-size:12px; }
+.btn-danger { background:#fff0f0; color:var(--exit); border:1.5px solid #ffd0d3; }
+.btn-danger:hover { background:var(--accent2-light); }
+.btn-ghost { background:transparent; border:1.5px solid var(--border); color:var(--text2); }
+.btn-ghost:hover { border-color:var(--accent); color:var(--accent); }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+
+/* CHECK-IN */
+.checkin-header { text-align:center; padding:32px 24px 24px; background:var(--surface); border-radius:16px; border:1px solid var(--border); margin-bottom:16px; box-shadow:var(--shadow); }
+.checkin-header .school-icon { font-size:48px; margin-bottom:12px; }
+.checkin-header h1 { font-size:24px; font-weight:900; color:var(--accent); margin-bottom:6px; }
+.checkin-header p { font-size:14px; color:var(--text2); }
+.checkin-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:28px 24px; box-shadow:var(--shadow); }
+.checkin-select {
+  width:100%; font-size:18px; padding:14px 44px 14px 16px;
+  border:2px solid var(--border); border-radius:12px; background:var(--surface2);
+  color:var(--text); font-family:inherit; font-weight:500; margin-bottom:20px;
+  outline:none; appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236b6b6b' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 14px center; background-size:20px;
+}
+.checkin-select:focus { border-color:var(--accent); background-color:#fff; }
+.current-status-banner { border-radius:10px; padding:12px 16px; margin-bottom:20px; font-size:14px; font-weight:600; text-align:center; display:none; }
+.current-status-banner.in  { background:var(--accent-light); color:var(--enter); }
+.current-status-banner.out { background:var(--surface2); color:var(--text2); border:1px solid var(--border); }
+.checkin-buttons { display:flex; flex-direction:column; gap:10px; }
+
+.success-screen { display:none; text-align:center; padding:40px 24px; background:var(--surface); border-radius:16px; border:1px solid var(--border); box-shadow:var(--shadow); animation:fadeIn .4s ease; }
+.success-screen.show { display:block; }
+.success-icon { font-size:64px; margin-bottom:16px; }
+.success-title { font-size:26px; font-weight:900; margin-bottom:8px; }
+.success-title.enter { color:var(--enter); }
+.success-title.exit  { color:var(--exit); }
+.success-student { font-size:18px; font-weight:700; margin-bottom:6px; }
+.success-time { font-size:13px; color:var(--text2); margin-bottom:24px; font-family:'DM Mono',monospace; }
+.notify-badge { display:inline-flex; align-items:center; gap:8px; background:#f0fff4; border:1px solid #b7dfc0; color:#1a6630; border-radius:8px; padding:10px 16px; font-size:13px; font-weight:600; margin-bottom:20px; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+/* ADMIN QR */
+.qr-print-card { background:var(--surface); border:2px dashed var(--border); border-radius:16px; padding:32px; text-align:center; }
+.qr-print-card h3 { font-size:20px; font-weight:900; margin-bottom:4px; color:var(--accent); }
+.qr-print-card p  { font-size:13px; color:var(--text2); margin-bottom:24px; }
+#classroom-qr { margin:0 auto 20px; width:180px; height:180px; }
+#classroom-qr canvas, #classroom-qr img { border-radius:8px; }
+.qr-url { font-family:'DM Mono',monospace; font-size:10px; color:var(--text3); word-break:break-all; background:var(--surface2); padding:8px 12px; border-radius:6px; margin-bottom:12px; }
+.print-hint { font-size:12px; color:var(--text3); }
+
+.student-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:10px; }
+.student-card { background:var(--surface2); border:1.5px solid var(--border); border-radius:12px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; transition:all .15s; }
+.student-card:hover { border-color:var(--accent); box-shadow:var(--shadow); }
+.student-name { font-size:15px; font-weight:700; }
+.student-meta { font-size:12px; color:var(--text2); }
+.student-status { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; width:fit-content; }
+.status-in  { background:var(--accent-light); color:var(--enter); }
+.status-out { background:var(--surface2); color:var(--text3); border:1px solid var(--border); }
+.status-dot { width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
+.status-in .status-dot { animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+.student-actions { display:flex; gap:6px; }
+
+.stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:16px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px; box-shadow:var(--shadow); }
+.stat-label { font-size:11px; color:var(--text3); font-weight:600; letter-spacing:.05em; text-transform:uppercase; margin-bottom:6px; }
+.stat-value { font-size:28px; font-weight:900; font-family:'DM Mono',monospace; }
+.stat-value.green { color:var(--enter); }
+.stat-value.blue  { color:#1d6fa5; }
+
+.log-controls { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px; }
+.filter-pills { display:flex; gap:6px; }
+.filter-pill { padding:4px 14px; border-radius:20px; font-size:12px; font-weight:700; cursor:pointer; border:1.5px solid var(--border); background:transparent; color:var(--text2); font-family:inherit; transition:all .15s; }
+.filter-pill.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+table { width:100%; border-collapse:collapse; font-size:14px; }
+th { text-align:left; padding:8px 12px; font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; border-bottom:2px solid var(--border); }
+td { padding:11px 12px; border-bottom:1px solid var(--surface2); vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:var(--surface2); }
+
+.badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700; }
+.badge-enter { background:var(--accent-light); color:var(--enter); }
+.badge-exit  { background:var(--accent2-light); color:var(--exit); }
+
+.empty-state { text-align:center; padding:48px 24px; color:var(--text3); }
+.empty-icon { font-size:40px; margin-bottom:10px; }
+.empty-state p { font-size:14px; }
+
+.parent-header { display:flex; align-items:center; gap:16px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px; margin-bottom:16px; box-shadow:var(--shadow); }
+.parent-avatar { width:52px; height:52px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:900; flex-shrink:0; }
+.parent-info h3 { font-size:18px; font-weight:900; margin-bottom:4px; }
+.parent-info p  { font-size:13px; color:var(--text2); }
+
+.line-notice { background:linear-gradient(135deg,#06c755,#00b300); color:#fff; border-radius:12px; padding:16px 20px; display:flex; align-items:center; gap:14px; margin-bottom:16px; box-shadow:var(--shadow); }
+.line-icon { font-size:28px; flex-shrink:0; }
+.line-notice-text h4 { font-size:14px; font-weight:700; margin-bottom:3px; }
+.line-notice-text p  { font-size:12px; opacity:.85; }
+
+/* NOTIFICATION MODAL */
+.notif-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:300; align-items:flex-end; justify-content:center; padding:0 12px 32px; }
+.notif-overlay.open { display:flex; animation:fadeInBg .2s; }
+@keyframes fadeInBg { from{opacity:0} to{opacity:1} }
+.notif-card { background:var(--surface); border-radius:20px; padding:28px 24px 24px; width:100%; max-width:400px; animation:slideUp .25s ease; box-shadow:var(--shadow-lg); }
+@keyframes slideUp { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
+.notif-header { display:flex; align-items:center; gap:12px; margin-bottom:18px; padding-bottom:16px; border-bottom:1px solid var(--border); }
+.notif-line-badge { background:#06c755; color:#fff; font-size:22px; width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.notif-header-text h4 { font-size:14px; font-weight:700; margin-bottom:2px; }
+.notif-header-text p  { font-size:12px; color:var(--text2); }
+.notif-bubble { background:#e8f5e9; border-radius:4px 16px 16px 16px; padding:16px 18px; font-size:14px; line-height:1.8; margin-bottom:18px; border-left:3px solid #06c755; color:var(--text); }
+.notif-type-enter { color:var(--enter); font-weight:700; }
+.notif-type-exit  { color:var(--exit);  font-weight:700; }
+.notif-footer { font-size:11px; color:var(--text3); text-align:center; margin-bottom:16px; }
+
+/* LOADING */
+.loading-overlay { display:none; position:fixed; inset:0; background:rgba(255,255,255,.7); z-index:500; align-items:center; justify-content:center; flex-direction:column; gap:12px; }
+.loading-overlay.show { display:flex; }
+.spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.loading-text { font-size:14px; color:var(--text2); font-weight:500; }
+
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px); background:#1a1a1a; color:#fff; border-radius:10px; padding:11px 20px; font-size:13px; font-weight:500; z-index:999; transition:transform .3s ease; white-space:nowrap; box-shadow:var(--shadow-lg); }
+.toast.show { transform:translateX(-50%) translateY(0); }
+
+@media(max-width:600px) {
+  nav { padding:0 12px; }
+  .page { padding:16px 12px; }
+  .nav-brand { font-size:13px; margin-right:10px; }
+  .nav-tab { padding:5px 10px; font-size:12px; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">📚 塾管理</div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('checkin',this)">入退室</button>
+    <button class="nav-tab" onclick="showPage('admin',this)">管理者</button>
+    <button class="nav-tab" onclick="showPage('log',this)">ログ</button>
+    <button class="nav-tab" onclick="showPage('parent',this)">保護者</button>
+  </div>
+</nav>
+
+<!-- CHECK-IN -->
+<div id="page-checkin" class="page active">
+  <div class="checkin-header">
+    <div class="school-icon">🏫</div>
+    <h1>入退室登録</h1>
+    <p>名前を選んでボタンを押してください</p>
+  </div>
+  <div class="checkin-card" id="checkin-form-area">
+    <div class="section-label">① 名前を選ぶ</div>
+    <select class="checkin-select" id="checkin-select" onchange="onStudentSelect()">
+      <option value="">── 読み込み中... ──</option>
+    </select>
+    <div class="current-status-banner" id="current-status-banner"></div>
+    <div class="checkin-buttons" id="checkin-buttons" style="display:none">
+      <div class="section-label">② 入室 or 退室を選ぶ</div>
+      <button class="btn btn-enter" id="btn-enter" onclick="submitCheckin('enter')">📥 入室する</button>
+      <button class="btn btn-exit"  id="btn-exit"  onclick="submitCheckin('exit')">📤 退室する</button>
+    </div>
+  </div>
+  <div class="success-screen" id="success-screen">
+    <div class="success-icon" id="success-icon"></div>
+    <div class="success-title" id="success-title"></div>
+    <div class="success-student" id="success-student"></div>
+    <div class="success-time" id="success-time"></div>
+    <div class="notify-badge">💬 保護者へLINE通知を送信しました</div>
+    <button class="btn btn-ghost" onclick="resetCheckin()" style="width:100%">← 戻る</button>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="page-admin" class="page">
+  <h2>管理者設定</h2>
+  <div class="card">
+    <div class="section-label">教室に貼るQRコード</div>
+    <div class="qr-print-card">
+      <h3>📚 入退室登録</h3>
+      <p>スマートフォンでスキャンして入退室を記録してください</p>
+      <div id="classroom-qr"></div>
+      <div class="qr-url" id="classroom-url"></div>
+      <div class="print-hint">このQRコードを印刷して教室の入口に貼ってください</div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="window.print()">🖨️ 印刷</button>
+      <button class="btn btn-ghost btn-sm" onclick="copyURL()">🔗 URLをコピー</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-label">生徒を追加</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>生徒名</label>
+        <input type="text" id="input-name" placeholder="例：田中 太郎">
+      </div>
+      <div class="form-group">
+        <label>学年</label>
+        <select id="input-grade">
+          <option>中1</option><option>中2</option><option selected>中3</option>
+          <option>高1</option><option>高2</option><option>高3</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>保護者LINE ID（メモ）</label>
+        <input type="text" id="input-line" placeholder="@xxxxxxxx">
+      </div>
+      <button class="btn btn-primary" id="btn-add-student" onclick="addStudent()">追加</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-label">生徒一覧</div>
+    <div class="student-grid" id="student-grid">
+      <div class="empty-state"><div class="empty-icon">⏳</div><p>読み込み中...</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- LOG -->
+<div id="page-log" class="page">
+  <h2>入退室ログ</h2>
+  <div class="stats-row" id="stats-row"></div>
+  <div class="card">
+    <div class="log-controls">
+      <div class="filter-pills">
+        <button class="filter-pill active" onclick="filterLog('all',this)">すべて</button>
+        <button class="filter-pill" onclick="filterLog('enter',this)">入室のみ</button>
+        <button class="filter-pill" onclick="filterLog('exit',this)">退室のみ</button>
+      </div>
+      <button class="btn btn-sm btn-danger" onclick="clearLog()">ログ削除</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>生徒名</th><th>学年</th><th>種別</th><th>日時</th></tr></thead>
+        <tbody id="log-tbody"></tbody>
+      </table>
+    </div>
+    <div id="log-empty" class="empty-state" style="display:none">
+      <div class="empty-icon">📋</div><p>記録がありません</p>
+    </div>
+  </div>
+</div>
+
+<!-- PARENT -->
+<div id="page-parent" class="page">
+  <h2>保護者確認</h2>
+  <div class="line-notice">
+    <div class="line-icon">💬</div>
+    <div class="line-notice-text">
+      <h4>本番ではLINEに自動通知されます</h4>
+      <p>このデモでは送信される通知内容をプレビュー表示しています</p>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-label">生徒を選択</div>
+    <div class="form-row">
+      <select id="parent-select" style="flex:1">
+        <option value="">── 生徒を選んでください ──</option>
+      </select>
+      <button class="btn btn-primary" onclick="showParentView()">確認</button>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-top:10px">
+      💡 本番では保護者ごとの固有URLを発行し、ブックマークするだけで確認できます
+    </div>
+  </div>
+  <div id="parent-view" style="display:none">
+    <div class="parent-header" id="parent-header"></div>
+    <div class="stats-row" id="parent-stats"></div>
+    <div class="card">
+      <div class="section-label">入退室履歴</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>種別</th><th>日時</th><th>通知</th></tr></thead>
+          <tbody id="parent-tbody"></tbody>
+        </table>
+      </div>
+      <div id="parent-empty" class="empty-state" style="display:none">
+        <div class="empty-icon">📋</div><p>履歴がありません</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LINE通知プレビューモーダル -->
+<div class="notif-overlay" id="notif-overlay" onclick="closeNotif()">
+  <div class="notif-card" onclick="event.stopPropagation()">
+    <div class="notif-header">
+      <div class="notif-line-badge">💬</div>
+      <div class="notif-header-text">
+        <h4>LINE メッセージ（送信プレビュー）</h4>
+        <p>保護者のスマホに届くイメージ</p>
+      </div>
+    </div>
+    <div class="notif-bubble" id="notif-bubble"></div>
+    <div class="notif-footer">※ 本番はLINE Messaging APIで自動送信されます</div>
+    <button class="btn btn-primary" style="width:100%" onclick="closeNotif()">閉じる</button>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">処理中...</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── SUPABASE ─────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://yvtoeozlfephxbfupdrc.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2dG9lb3psZmVwaHhiZnVwZHJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NzM4MDAsImV4cCI6MjA5MjM0OTgwMH0.-olnHoQNEGperbu-igdLUkERCxZ31QY0Ut8gHFiaudo';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── STATE ────────────────────────────────────────────────────────
+let students  = [];
+let logs      = [];
+let logFilter = 'all';
+
+// ── LOADING ──────────────────────────────────────────────────────
+function showLoading(msg='処理中...') {
+  document.getElementById('loading-text').textContent = msg;
+  document.getElementById('loading-overlay').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('show');
+}
+
+// ── NAV ──────────────────────────────────────────────────────────
+function showPage(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  if (el) el.classList.add('active');
+  if (id === 'checkin') loadAndRenderCheckin();
+  if (id === 'admin')   loadAndRenderAdmin();
+  if (id === 'log')     loadAndRenderLog();
+  if (id === 'parent')  loadAndRenderParent();
+}
+
+// ── SUPABASE FETCH ────────────────────────────────────────────────
+async function fetchStudents() {
+  const { data, error } = await db.from('students').select('*').order('created_at');
+  if (error) throw error;
+  students = data;
+  return data;
+}
+
+async function fetchLogs(filter='all') {
+  let q = db.from('attendance_logs')
+    .select('*, students(name, grade)')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (filter !== 'all') q = q.eq('type', filter);
+  const { data, error } = await q;
+  if (error) throw error;
+  logs = data;
+  return data;
+}
+
+// ── CHECK-IN ─────────────────────────────────────────────────────
+async function loadAndRenderCheckin() {
+  try {
+    await fetchStudents();
+    renderCheckinSelect();
+  } catch(e) {
+    showToast('⚠️ データの読み込みに失敗しました');
+  }
+}
+
+function renderCheckinSelect() {
+  const sel = document.getElementById('checkin-select');
+  sel.innerHTML = '<option value="">── 名前を選んでください ──</option>' +
+    students.map(s => `<option value="${s.id}">${s.name}（${s.grade}）</option>`).join('');
+  document.getElementById('checkin-buttons').style.display = 'none';
+  document.getElementById('current-status-banner').style.display = 'none';
+}
+
+function onStudentSelect() {
+  const id = document.getElementById('checkin-select').value;
+  const banner = document.getElementById('current-status-banner');
+  const btns   = document.getElementById('checkin-buttons');
+  if (!id) { banner.style.display='none'; btns.style.display='none'; return; }
+  const s = students.find(st => st.id === id);
+  banner.style.display = 'block';
+  if (s.in_room) {
+    banner.className = 'current-status-banner in';
+    banner.textContent = '✅ 現在 在室中です';
+  } else {
+    banner.className = 'current-status-banner out';
+    banner.textContent = '⬜ 現在 退室中です';
+  }
+  btns.style.display = 'flex';
+}
+
+async function submitCheckin(type) {
+  const id = document.getElementById('checkin-select').value;
+  if (!id) { showToast('⚠️ 名前を選んでください'); return; }
+  const s = students.find(st => st.id === id);
+  if (type === 'enter' && s.in_room)  { showToast('⚠️ すでに在室中です'); return; }
+  if (type === 'exit'  && !s.in_room) { showToast('⚠️ すでに退室済みです'); return; }
+
+  showLoading(type === 'enter' ? '入室を記録中...' : '退室を記録中...');
+
+  try {
+    // 1. studentsテーブルのin_roomを更新
+    const { error: e1 } = await db.from('students')
+      .update({ in_room: type === 'enter' })
+      .eq('id', id);
+    if (e1) throw e1;
+
+    // 2. ログを追加
+    const { error: e2 } = await db.from('attendance_logs')
+      .insert({ student_id: id, type });
+    if (e2) throw e2;
+
+    // ローカル状態更新
+    s.in_room = (type === 'enter');
+
+    hideLoading();
+
+    const now = new Date();
+    // 完了画面
+    document.getElementById('checkin-form-area').style.display = 'none';
+    const ss = document.getElementById('success-screen');
+    ss.classList.add('show');
+    document.getElementById('success-icon').textContent    = type==='enter' ? '📥' : '📤';
+    const title = document.getElementById('success-title');
+    title.textContent  = type==='enter' ? '入室しました' : '退室しました';
+    title.className    = 'success-title ' + type;
+    document.getElementById('success-student').textContent = s.name + ' さん（' + s.grade + '）';
+    document.getElementById('success-time').textContent    = formatTime(now);
+
+    showNotifModal(s, type, now);
+
+  } catch(e) {
+    hideLoading();
+    showToast('⚠️ エラーが発生しました: ' + e.message);
+  }
+}
+
+function resetCheckin() {
+  document.getElementById('checkin-form-area').style.display = 'block';
+  document.getElementById('success-screen').classList.remove('show');
+  document.getElementById('checkin-select').value = '';
+  document.getElementById('checkin-buttons').style.display = 'none';
+  document.getElementById('current-status-banner').style.display = 'none';
+}
+
+// ── LINE通知モーダル ──────────────────────────────────────────────
+function showNotifModal(student, type, time) {
+  const label = type === 'enter' ? '入室' : '退室';
+  const emoji = type === 'enter' ? '📥' : '📤';
+  document.getElementById('notif-bubble').innerHTML =
+    `${emoji} <span class="notif-type-${type}">${label}のお知らせ</span><br><br>` +
+    `<strong>${student.name}</strong> さんが<br>` +
+    `<strong>${formatTime(time)}</strong> に<br>` +
+    `<span class="notif-type-${type}"><strong>${label}しました。</strong></span><br><br>` +
+    `──────────<br>📚 ○○学習塾`;
+  document.getElementById('notif-overlay').classList.add('open');
+}
+function closeNotif() {
+  document.getElementById('notif-overlay').classList.remove('open');
+}
+
+// ── ADMIN ────────────────────────────────────────────────────────
+async function loadAndRenderAdmin() {
+  renderClassroomQR();
+  try {
+    await fetchStudents();
+    renderStudents();
+  } catch(e) {
+    showToast('⚠️ データの読み込みに失敗しました');
+  }
+}
+
+function renderClassroomQR() {
+  const url = window.location.href.split('?')[0];
+  document.getElementById('classroom-url').textContent = url;
+  const container = document.getElementById('classroom-qr');
+  container.innerHTML = '';
+  new QRCode(container, {
+    text: url, width:180, height:180,
+    colorDark:'#1a1a1a', colorLight:'#ffffff',
+    correctLevel: QRCode.CorrectLevel.M,
+  });
+}
+
+function copyURL() {
+  const url = document.getElementById('classroom-url').textContent;
+  navigator.clipboard.writeText(url).then(() => showToast('✅ URLをコピーしました'));
+}
+
+async function addStudent() {
+  const name  = document.getElementById('input-name').value.trim();
+  const grade = document.getElementById('input-grade').value;
+  const line  = document.getElementById('input-line').value.trim();
+  if (!name) { showToast('⚠️ 生徒名を入力してください'); return; }
+
+  const btn = document.getElementById('btn-add-student');
+  btn.disabled = true;
+  showLoading('生徒を追加中...');
+
+  try {
+    const { error } = await db.from('students')
+      .insert({ name, grade, line_id: line || null, in_room: false });
+    if (error) throw error;
+
+    document.getElementById('input-name').value = '';
+    document.getElementById('input-line').value = '';
+    await fetchStudents();
+    renderStudents();
+    showToast('✅ ' + name + ' を追加しました');
+  } catch(e) {
+    showToast('⚠️ エラー: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    hideLoading();
+  }
+}
+
+function renderStudents() {
+  const grid = document.getElementById('student-grid');
+  if (!students.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">👤</div><p>生徒が登録されていません</p></div>';
+    return;
+  }
+  grid.innerHTML = students.map(s => `
+    <div class="student-card">
+      <div>
+        <div class="student-name">${s.name}</div>
+        <div class="student-meta">${s.grade}${s.line_id ? ' · ' + s.line_id : ''}</div>
+      </div>
+      <span class="student-status ${s.in_room ? 'status-in' : 'status-out'}">
+        <span class="status-dot"></span>${s.in_room ? '在室中' : '退室中'}
+      </span>
+      <div class="student-actions">
+        <button class="btn btn-sm btn-danger" onclick="removeStudent('${s.id}','${s.name}')">削除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function removeStudent(id, name) {
+  if (!confirm(`「${name}」を削除してよいですか？\n（この生徒のログも削除されます）`)) return;
+  showLoading('削除中...');
+  try {
+    const { error } = await db.from('students').delete().eq('id', id);
+    if (error) throw error;
+    await fetchStudents();
+    renderStudents();
+    showToast('🗑️ 削除しました');
+  } catch(e) {
+    showToast('⚠️ エラー: ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ── LOG ──────────────────────────────────────────────────────────
+async function loadAndRenderLog() {
+  try {
+    await Promise.all([fetchStudents(), fetchLogs(logFilter)]);
+    renderLog();
+  } catch(e) {
+    showToast('⚠️ ログの読み込みに失敗しました');
+  }
+}
+
+function filterLog(type, btn) {
+  logFilter = type;
+  document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadAndRenderLog();
+}
+
+function renderLog() {
+  const today   = new Date().toDateString();
+  const todayL  = logs.filter(l => new Date(l.created_at).toDateString() === today);
+  const inCount = students.filter(s => s.in_room).length;
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card"><div class="stat-label">現在在室</div><div class="stat-value green">${inCount}</div></div>
+    <div class="stat-card"><div class="stat-label">本日の記録</div><div class="stat-value blue">${todayL.length}</div></div>
+    <div class="stat-card"><div class="stat-label">登録生徒</div><div class="stat-value">${students.length}</div></div>
+  `;
+  const tbody = document.getElementById('log-tbody');
+  const empty = document.getElementById('log-empty');
+  if (!logs.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = logs.map(l => `
+    <tr>
+      <td style="font-weight:600">${l.students?.name ?? '不明'}</td>
+      <td style="color:var(--text2)">${l.students?.grade ?? ''}</td>
+      <td><span class="badge ${l.type==='enter'?'badge-enter':'badge-exit'}">${l.type==='enter'?'📥 入室':'📤 退室'}</span></td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${formatTime(new Date(l.created_at))}</td>
+    </tr>
+  `).join('');
+}
+
+async function clearLog() {
+  if (!confirm('すべてのログを削除しますか？')) return;
+  showLoading('削除中...');
+  try {
+    const { error } = await db.from('attendance_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw error;
+    logs = [];
+    renderLog();
+    showToast('🗑️ ログを削除しました');
+  } catch(e) {
+    showToast('⚠️ エラー: ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ── PARENT ───────────────────────────────────────────────────────
+async function loadAndRenderParent() {
+  try {
+    await fetchStudents();
+    const sel = document.getElementById('parent-select');
+    sel.innerHTML = '<option value="">── 生徒を選んでください ──</option>' +
+      students.map(s => `<option value="${s.id}">${s.name}（${s.grade}）</option>`).join('');
+    document.getElementById('parent-view').style.display = 'none';
+  } catch(e) {
+    showToast('⚠️ データの読み込みに失敗しました');
+  }
+}
+
+async function showParentView() {
+  const id = document.getElementById('parent-select').value;
+  if (!id) { showToast('⚠️ 生徒を選んでください'); return; }
+  showLoading('読み込み中...');
+  try {
+    const s = students.find(st => st.id === id);
+    const { data: sLog, error } = await db.from('attendance_logs')
+      .select('*')
+      .eq('student_id', id)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+
+    document.getElementById('parent-header').innerHTML = `
+      <div class="parent-avatar">${s.name[0]}</div>
+      <div class="parent-info">
+        <h3>${s.name}</h3>
+        <p>${s.grade} &nbsp;·&nbsp; 現在：<strong style="color:${s.in_room?'var(--enter)':'var(--text2)'}">${s.in_room?'在室中':'退室中'}</strong></p>
+      </div>
+    `;
+    const today  = new Date().toDateString();
+    const todayC = sLog.filter(l => new Date(l.created_at).toDateString() === today).length;
+    document.getElementById('parent-stats').innerHTML = `
+      <div class="stat-card"><div class="stat-label">今日の記録</div><div class="stat-value blue">${todayC}</div></div>
+      <div class="stat-card"><div class="stat-label">累計記録</div><div class="stat-value">${sLog.length}</div></div>
+    `;
+    const tbody = document.getElementById('parent-tbody');
+    const empty = document.getElementById('parent-empty');
+    if (!sLog.length) { tbody.innerHTML=''; empty.style.display='block'; }
+    else {
+      empty.style.display = 'none';
+      tbody.innerHTML = sLog.map(l => `
+        <tr>
+          <td><span class="badge ${l.type==='enter'?'badge-enter':'badge-exit'}">${l.type==='enter'?'📥 入室':'📤 退室'}</span></td>
+          <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${formatTime(new Date(l.created_at))}</td>
+          <td style="font-size:12px;color:#1a8a30;font-weight:600">💬 LINE送信済</td>
+        </tr>
+      `).join('');
+    }
+    document.getElementById('parent-view').style.display = 'block';
+  } catch(e) {
+    showToast('⚠️ エラー: ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ── UTILS ────────────────────────────────────────────────────────
+function formatTime(d) {
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// INIT
+loadAndRenderCheckin();
+</script>
+</body>
+</html>
