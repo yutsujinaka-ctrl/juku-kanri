@@ -203,12 +203,12 @@ tr:hover td { background:var(--surface2); }
 <body>
 
 <nav>
-  <div class="nav-brand">📚 塾管理</div>
+  <div class="nav-brand">📚 桜凛進学塾</div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showPage('checkin',this)">入退室</button>
-    <button class="nav-tab" onclick="showPage('admin',this)">管理者</button>
-    <button class="nav-tab" onclick="showPage('log',this)">ログ</button>
-    <button class="nav-tab" onclick="showPage('parent',this)">保護者</button>
+    <button class="nav-tab" onclick="requireAuth('admin',this)">管理者</button>
+    <button class="nav-tab" onclick="requireAuth('log',this)">ログ</button>
+    <button class="nav-tab" onclick="requireAuth('parent',this)">保護者</button>
   </div>
 </nav>
 
@@ -367,6 +367,26 @@ tr:hover td { background:var(--surface2); }
   <div class="loading-text" id="loading-text">処理中...</div>
 </div>
 
+
+<!-- パスワードモーダル -->
+<div class="notif-overlay" id="auth-modal">
+  <div class="notif-card" style="max-width:340px">
+    <div class="notif-header">
+      <div class="notif-line-badge" style="background:var(--accent)">🔒</div>
+      <div class="notif-header-text">
+        <h4>管理者パスワード</h4>
+        <p>スタッフのみアクセスできます</p>
+      </div>
+    </div>
+    <input type="password" id="auth-input" placeholder="パスワードを入力"
+      style="width:100%;font-size:16px;padding:12px 16px;border:2px solid var(--border);border-radius:10px;margin-bottom:12px;background:var(--surface2);font-family:inherit;outline:none;color:var(--text)"
+      onkeydown="if(event.key==='Enter')checkAuth()">
+    <div id="auth-error" style="display:none;color:var(--exit);font-size:13px;margin-bottom:10px">パスワードが違います</div>
+    <button class="btn btn-primary" style="width:100%;margin-bottom:10px" onclick="checkAuth()">ログイン</button>
+    <button class="btn btn-ghost" style="width:100%" onclick="closeAuth()">キャンセル</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -388,6 +408,38 @@ function showLoading(msg='処理中...') {
 }
 function hideLoading() {
   document.getElementById('loading-overlay').classList.remove('show');
+}
+
+
+// ── AUTH ─────────────────────────────────────────────────────────
+const ADMIN_PASSWORD = 'ohrin1';
+let authed = false;
+let pendingPage = null;
+let pendingEl = null;
+
+function requireAuth(id, el) {
+  if (authed) { showPage(id, el); return; }
+  pendingPage = id;
+  pendingEl = el;
+  document.getElementById('auth-input').value = '';
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('auth-modal').classList.add('open');
+  setTimeout(() => document.getElementById('auth-input').focus(), 100);
+}
+function checkAuth() {
+  const val = document.getElementById('auth-input').value;
+  if (val === ADMIN_PASSWORD) {
+    authed = true;
+    document.getElementById('auth-modal').classList.remove('open');
+    if (pendingPage) showPage(pendingPage, pendingEl);
+  } else {
+    document.getElementById('auth-error').style.display = 'block';
+    document.getElementById('auth-input').value = '';
+  }
+}
+function closeAuth() {
+  document.getElementById('auth-modal').classList.remove('open');
+  pendingPage = null; pendingEl = null;
 }
 
 // ── NAV ──────────────────────────────────────────────────────────
