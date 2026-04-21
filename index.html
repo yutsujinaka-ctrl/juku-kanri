@@ -502,6 +502,7 @@ async function submitCheckin(type) {
     document.getElementById('success-student').textContent = s.name + ' さん（' + s.grade + '）';
     document.getElementById('success-time').textContent    = formatTime(now);
 
+    sendLineNotify(s, type);
     showNotifModal(s, type, now);
 
   } catch(e) {
@@ -516,6 +517,25 @@ function resetCheckin() {
   document.getElementById('checkin-select').value = '';
   document.getElementById('checkin-buttons').style.display = 'none';
   document.getElementById('current-status-banner').style.display = 'none';
+}
+
+// ── LINE通知送信 ─────────────────────────────────────────────────
+async function sendLineNotify(student, type) {
+  if (!student.line_id || !student.line_id.startsWith('U')) return;
+  try {
+    await fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: student.line_id,
+        studentName: student.name,
+        grade: student.grade,
+        type: type,
+      }),
+    });
+  } catch(e) {
+    console.error('LINE通知エラー:', e);
+  }
 }
 
 // ── LINE通知モーダル ──────────────────────────────────────────────
